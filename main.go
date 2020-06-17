@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -15,6 +16,7 @@ const scholar = "https://scholar.google.com/scholar?hl=zh-CN&as_sdt=0,5&q="
 
 func main() {
 
+	ID := 0
 	fileName := "articles.csv"
 	file, err := os.Create(fileName)
 	if err != nil {
@@ -45,10 +47,33 @@ func main() {
 
 	c.OnHTML("#gs_res_ccl", func(e *colly.HTMLElement) {
 		e.ForEach(".gs_ri", func(i int, e *colly.HTMLElement) {
-			authorAndPress := strings.Split(e.DOM.Find(".gs_a").Text(), "-")
-			pressAndDate := strings.Split(authorAndPress[1], ",")
-			err := writer.Write([]string{
-				strconv.Itoa(i),                                                     // ID
+
+			authorAndPress := make([]string, 2)
+			pressAndDate := make([]string, 2)
+
+			tmpAP := e.DOM.Find(".gs_a").Text()
+			if strings.Contains(tmpAP, "-") {
+				authorAndPress = strings.Split(tmpAP, "-")
+			} else {
+				authorAndPress[0] = tmpAP
+				authorAndPress[1] = ""
+			}
+
+			if authorAndPress[1] != "" {
+				if strings.Contains(authorAndPress[1], ",") {
+					pressAndDate = strings.Split(authorAndPress[1], ",")
+				} else {
+					pressAndDate[0] = authorAndPress[1]
+					pressAndDate[1] = ""
+				}
+			} else {
+				pressAndDate[0] = ""
+				pressAndDate[1] = ""
+			}
+
+			ID += 1
+			writer.Write([]string{
+				strconv.Itoa(ID),                                                    // ID
 				e.DOM.Find(".gs_rt").Text(),                                         // Title
 				strings.TrimSpace(authorAndPress[0]),                                // Author
 				strings.TrimSpace(pressAndDate[0]),                                  // Press
@@ -56,17 +81,22 @@ func main() {
 				e.DOM.Find(".gs_rs").Text(),                                         // Abstract
 				strings.Split(e.DOM.Find(".gs_fl>a:nth-of-type(3)").Text(), "：")[1], // Reference Number
 			})
-			if err != nil {
-				log.Fatalln(err)
-			}
 		})
 	})
 
 	c.OnHTML("#gs_nml", func(e *colly.HTMLElement) {
 		e.ForEach("a[href]", func(i int, e *colly.HTMLElement) {
-			link := e.Text
-			_ = link
+			link := e.Attr("href")
+			c.Visit(e.Request.AbsoluteURL(link))
 		})
+	})
+
+	c.OnRequest(func(r *colly.Request) {
+		log.Printf("Visiting : %s\n", r.URL.String())
+	})
+
+	c.OnError(func(r *colly.Response, err error) {
+		fmt.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
 	})
 
 	err = c.Visit(scholar + "acute+pancreatitis")
