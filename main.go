@@ -66,6 +66,7 @@ func main() {
 		e.ForEach("a[href]", func(i int, e *colly.HTMLElement) {
 			link := e.Text
 			_ = link
+			_ = link
 		})
 	})
 
